@@ -9,7 +9,7 @@ public class ParseNumberOperator : IGQIColumnOperator, IGQIRowOperator, IGQIInpu
     private readonly GQIStringDropdownArgument _typeArg;
 
     // Type specific parser
-    private IParser _parser;
+    private IParseOperator _typedParseOperator;
 
     /// <summary>
     /// Initializes a new instance of the <see cref="ParseNumberOperator"/> class.
@@ -58,7 +58,7 @@ public class ParseNumberOperator : IGQIColumnOperator, IGQIRowOperator, IGQIInpu
 
     /// <summary>
     /// Called by GQI to expose the chosen argument values.
-    /// Validates the provided arguments values and initializes the type specific <see cref="_parser"/>.
+    /// Validates the provided arguments values and initializes the type specific <see cref="_typedParseOperator"/>.
     /// </summary>
     /// <param name="args">Collection of chosen argument values.</param>
     /// <returns>Unused.</returns>
@@ -74,29 +74,29 @@ public class ParseNumberOperator : IGQIColumnOperator, IGQIRowOperator, IGQIInpu
         if (!Enum.TryParse(selectedTargetType, out GQIColumnType targetType))
             throw new Exception("Selected target type is invalid.");
 
-        _parser = CreateParser(textColumn, targetType);
+        _typedParseOperator = CreateTypedParseOperator(textColumn, targetType);
 
         return default;
     }
 
     /// <summary>
     /// Called by GQI to determine the resulting columns.
-    /// Lets the type specific <see cref="_parser"/> replace the text column with a column of the target type.
+    /// Lets the type specific <see cref="_typedParseOperator"/> replace the text column with a column of the target type.
     /// </summary>
     /// <param name="header">The current collection of columns that should be modified.</param>
     public void HandleColumns(GQIEditableHeader header)
     {
-        _parser.HandleColumns(header);
+        _typedParseOperator.HandleColumns(header);
     }
 
     /// <summary>
     /// Called by GQI to handle each <paramref name="row"/> in turn.
-    /// Lets the type specific <see cref="_parser"/> parse the value in the text column and store the parsed value back into the <paramref name="row"/>.
+    /// Lets the type specific <see cref="_typedParseOperator"/> parse the value in the text column and store the parsed value back into the <paramref name="row"/>.
     /// </summary>
     /// <param name="row">The next row that needs to be handled.</param>
     public void HandleRow(GQIEditableRow row)
     {
-        _parser.HandleRow(row);
+        _typedParseOperator.HandleRow(row);
     }
 
     /// <summary>
@@ -106,14 +106,16 @@ public class ParseNumberOperator : IGQIColumnOperator, IGQIRowOperator, IGQIInpu
     /// <param name="targetType">The type to which the text values should be parsed.</param>
     /// <returns>The type specific parser logic.</returns>
     /// <exception cref="NotImplementedException">If the <paramref name="targetType"/> is not supported.</exception>
-    private IParser CreateParser(GQIColumn<string> textColumn, GQIColumnType targetType)
+    private IParseOperator CreateTypedParseOperator(GQIColumn<string> textColumn, GQIColumnType targetType)
     {
         switch (targetType)
         {
             case GQIColumnType.Double:
-                return new DoubleParser(textColumn);
+                var doubleParser = new DoubleParser();
+                return new TypedParseOperator<double>(doubleParser, textColumn);
             case GQIColumnType.Int:
-                return new IntParser(textColumn);
+                var intParser = new IntParser();
+                return new TypedParseOperator<int>(intParser, textColumn);
             default:
                 throw new NotImplementedException("Target type is not supported.");
         }
